@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
-import itertools as it
 import crypt
 import os
+import itertools as it
 
 MIN_PASSWD_LEN = 3
 MAX_PASSWD_LEN = 10
@@ -83,11 +83,17 @@ class ShadowLine(object):
 
 
 def parse_shadow_line(line):
-    """Parses a line from the /etc/shadow file into a ShadowLine."""
+    """Parses a line from the /etc/shadow file into a ShadowLine.
+
+    Returns None if the line does not have an encrypted password.
+    """
 
     line_pieces = line.split(':')
     username = line_pieces[0]
     passwd = line_pieces[1]
+    if not passwd.startswith('$'):
+        return None
+
     last_passwd_change = line_pieces[2]
     min_days_between_passwd_changes = line_pieces[3]
     passwd_validity = line_pieces[4]
@@ -118,7 +124,7 @@ def crack_shadow_file(filename):
     with open(filename) as f:
         for line in f:
             shadow_line = parse_shadow_line(line)
-            if shadow_line.get_passwd_field().startswith('$'):
+            if shadow_line != None:
                 passwd = shadow_line.crack()
                 user = shadow_line._username
                 print('{}:'.format(user), passwd)
