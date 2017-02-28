@@ -2,6 +2,11 @@
 
 import itertools as it
 import crypt
+import os
+
+MIN_PASSWD_LEN = 3
+MAX_PASSWD_LEN = 10
+POSSIBLE_CHARS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 
 def encrypt(hash_algo_num, salt, passwd):
     """Returns the password hash (not the entire shadow line string)."""
@@ -38,14 +43,17 @@ class ShadowLine(object):
         self._account_inactive = account_inactive
         self._num_days_since_disable = num_days_since_disable
 
-    def crack(self, min_pass_len, max_pass_len, possible_chars):
+    def crack(self,
+              min_pass_len=MIN_PASSWD_LEN,
+              max_pass_len=MAX_PASSWD_LEN,
+              possible_chars=POSSIBLE_CHARS):
         """Attacks the hash with all possible combinations, increasing in length
 
         Returns: The password if a matching password was found; None otherwise
         """
         for length in range(min_pass_len, max_pass_len + 1):
             for possible_passwd in possible_passwds(length, possible_chars):
-                print(possible_passwd, end='\r')
+                print('{}:'.format(self._username), possible_passwd, end='\r')
                 # Resembles $6$salt$hashed-passwd
                 shadow_hash = encrypt(
                         self._hash_algo_num,
@@ -105,12 +113,20 @@ def parse_shadow_line(line):
             account_inactive,
             num_days_since_disable)
 
-MIN_PASSWD_LEN = 3
-MAX_PASSWD_LEN = 3
-POSSIBLE_CHARS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 
-passwd_hash = '$6$vb1tLY1qiY$jBQv/SXasS2vPiVJRsyY3udTsmeSHPiv23UjqB47UaLChPJ.wcABC.XQxyLNwAT7UgQsGXvQRt.We5gpbDXp20'
-line = 'tberry:{}:17148:0:99999:7:::'.format(passwd_hash)
-shadow_line = parse_shadow_line(line)
-sha = shadow_line.crack(MIN_PASSWD_LEN, MAX_PASSWD_LEN, POSSIBLE_CHARS)
-print(sha)
+def crack_shadow_file(filename):
+    with open(filename) as f:
+        for line in f:
+            shadow_line = parse_shadow_line(line)
+            if shadow_line.get_passwd_field().startswith('$'):
+                passwd = shadow_line.crack()
+                user = shadow_line._username
+                print('{}:'.format(user), passwd)
+
+def main():
+    # TODO: fancy CLI parsing
+    filename = os.sys.argv[1]
+    crack_shadow_file(filename)
+
+if __name__ == '__main__':
+    main()
