@@ -26,11 +26,12 @@ def encrypt(hash_algo_num, salt, passwd):
     return passwd_hash
 
 
-def possible_passwds(length, possible_chars):
-    """Generator for all possible combinations of possible_chars of a length"""
-    # TODO: could optimize - increase length by adding each possible char to
-    # each combination. no recalculation
-    return [''.join(cmb) for cmb in it.product(possible_chars, repeat=length)]
+def possible_passwds(min_length, max_length, possible_chars):
+    """Generates all possible combinations of `possible_chars` between
+    `min_length` and `max_length` (inclusive) characters long."""
+    for i in range(min_length, max_length + 1):
+        for cmb in it.product(possible_chars, repeat=i):
+            yield ''.join(cmb)
 
 
 class ShadowLine(object):
@@ -71,12 +72,11 @@ class ShadowLine(object):
         Returns: The password if a matching password was found; None otherwise
         """
         with ThreadPool() as p:
-            for length in range(min_pass_len, max_pass_len + 1):
-                passwd = first(p.imap_unordered(
-                    self._test_passwd,
-                    possible_passwds(length, possible_chars)))
-                if passwd is not None:
-                    return passwd
+            passwd = first(p.imap_unordered(
+                self._test_passwd,
+                possible_passwds(min_pass_len, max_pass_len, possible_chars)))
+            if passwd is not None:
+                return passwd
         return None
 
     def get_passwd_field(self):
