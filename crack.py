@@ -3,10 +3,17 @@
 import crypt
 import os
 import itertools as it
+from multiprocessing import Pool as ThreadPool
 
 MIN_PASSWD_LEN = 3
 MAX_PASSWD_LEN = 10
 POSSIBLE_CHARS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+
+def first(iterable):
+    """Like `any`, but returns the first truthy value in `iterable`. Returns
+    `None` if `any` would return false."""
+    return next((item for item in iterable if item), None)
+
 
 def encrypt(hash_algo_num, salt, passwd):
     """Returns the password hash (not the entire shadow line string)."""
@@ -43,6 +50,16 @@ class ShadowLine(object):
         self._account_inactive = account_inactive
         self._num_days_since_disable = num_days_since_disable
 
+    def _is_correct_passwd(self, passwd):
+        """Returns `True` if `passwd` is correct; `False` otherwise"""
+        print('{}:'.format(self._username), passwd, end='\r')
+        passwd_hash = encrypt(self._hash_algo_num, self._salt, passwd)
+        return passwd_hash == self._passwd_hash
+
+    def _test_passwd(self, passwd):
+        """Returns `passwd` if `passwd` is correct; None otherwise"""
+        return passwd if self._is_correct_passwd(passwd) else None
+
     def crack(self,
               min_pass_len=MIN_PASSWD_LEN,
               max_pass_len=MAX_PASSWD_LEN,
@@ -51,16 +68,13 @@ class ShadowLine(object):
 
         Returns: The password if a matching password was found; None otherwise
         """
-        for length in range(min_pass_len, max_pass_len + 1):
-            for possible_passwd in possible_passwds(length, possible_chars):
-                print('{}:'.format(self._username), possible_passwd, end='\r')
-                # Resembles $6$salt$hashed-passwd
-                shadow_hash = encrypt(
-                        self._hash_algo_num,
-                        self._salt,
-                        possible_passwd)
-                if shadow_hash == self._passwd_hash:
-                    return possible_passwd
+        with ThreadPool() as p:
+            for length in range(min_pass_len, max_pass_len + 1):
+                passwd = first(p.imap_unordered(
+                    self._test_passwd,
+                    possible_passwds(length, possible_chars)))
+                if passwd is not None:
+                    return passwd
         return None
 
     def get_passwd_field(self):
@@ -124,7 +138,7 @@ def crack_shadow_file(filename):
     with open(filename) as f:
         for line in f:
             shadow_line = parse_shadow_line(line)
-            if shadow_line != None:
+            if shadow_line is not None:
                 passwd = shadow_line.crack()
                 user = shadow_line._username
                 print('{}:'.format(user), passwd)
