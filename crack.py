@@ -3,11 +3,13 @@
 import crypt
 import os
 import itertools as it
+import string
+
 from multiprocessing import Pool as ThreadPool
 
 MIN_PASSWD_LEN = 3
 MAX_PASSWD_LEN = 10
-POSSIBLE_CHARS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+POSSIBLE_CHARS = string.ascii_lowercase + string.ascii_uppercase + string.digits
 
 def first(iterable):
     """Like `any`, but returns the first truthy value in `iterable`. Returns
