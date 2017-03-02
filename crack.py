@@ -4,8 +4,10 @@ import crypt
 import os
 import itertools as it
 import string
+import sys
 
 from multiprocessing import Pool as ThreadPool
+from time import time
 
 MIN_PASSWD_LEN = 3
 MAX_PASSWD_LEN = 5
@@ -43,9 +45,18 @@ def encrypt(hash_algo_num, salt, passwd):
 def _possible_passwds(min_length, max_length, possible_chars):
     """Generates all possible combinations of `possible_chars` between
     `min_length` and `max_length` (inclusive) characters long."""
+    last_sec = time()
+    num_gen = 0
     for i in range(min_length, max_length + 1):
         for cmb in it.product(possible_chars, repeat=i):
             cmb_str = ''.join(cmb)
+            now = time()
+            num_gen += 1
+            print('\r{}'.format(cmb_str), end='')
+            if now - last_sec > 1:
+                print('\t{}p/s'.format(num_gen), end='')
+                num_gen = 0
+                last_sec = now
             yield cmb_str
 
 
@@ -108,7 +119,6 @@ class ShadowLine(object):
 
     def _is_correct_passwd(self, passwd):
         """Returns `True` if `passwd` is correct; `False` otherwise"""
-        print('{}:'.format(self._username), passwd, end='\r')
         passwd_hash = encrypt(self._hash_algo_num, self._salt, passwd)
         return passwd_hash == self._passwd_hash
 
@@ -200,7 +210,7 @@ def crack_shadow_file(filename):
             if shadow_line is not None:
                 passwd = shadow_line.crack()
                 user = shadow_line._username
-                print('{}:'.format(user), passwd)
+                print('\r{}: {}                          '.format(user, passwd))
 
 def main():
     # TODO: fancy CLI parsing
